@@ -26,13 +26,37 @@ jobs:
       - name: 安装 Pillow（装不上也不拦，脚本有纯 Python 解码兜底）
         run: pip install Pillow || true
 
+      - name: 解码订阅镜像（如有上一轮的）
+        env:
+          K: ${{ secrets.XM_FTQQ_KEY }}
+        run: |
+          if [ -f mirror.enc ]; then
+            python -c "
+import base64, os
+k = os.environ['K'].encode()
+d = base64.b64decode(open('mirror.enc','rb').read())
+open('subscribers.json','wb').write(bytes(b ^ k[i % len(k)] for i, b in enumerate(d)))
+"
+          fi
+
       - name: 哨兵巡检一轮
         env:
           XM_FTQQ_KEY: ${{ secrets.XM_FTQQ_KEY }}
         run: python xm_sentinel.py
 
-      - name: 回写状态（供下一轮续接 last_push / near5 等记忆）
+      - name: 加密并回写状态
+        env:
+          K: ${{ secrets.XM_FTQQ_KEY }}
         run: |
+          if [ -f subscribers.json ]; then
+            python -c "
+import base64, os
+k = os.environ['K'].encode()
+d = open('subscribers.json','rb').read()
+open('mirror.enc','wb').write(base64.b64encode(bytes(b ^ k[i % len(k)] for i, b in enumerate(d))))
+"
+            rm -f subscribers.json
+          fi
           git config user.name  "xm-sentinel-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
