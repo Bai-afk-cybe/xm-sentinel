@@ -131,8 +131,7 @@ SUB_NTFY_SERVER = "https://ntfy.sh"
 # 推送通道（可被同目录 push_config.json 覆盖，见文件末尾说明）
 PUSH = {
     # 方糖（Server 酱）→ 微信。已有 key，默认开启。
-    "ftqq": {"enable": bool(os.environ.get("XM_FTQQ_KEY")),
-            "key": os.environ.get("XM_FTQQ_KEY", "")},
+    "ftqq": {"enable": True, "key": "SCT431207TfzoWwx8bEtO7zGoPphSg8nxx"},
     # Bark（iOS App）→ APNs，国内可达且支持「重要警告」突破静音。填 device key 后开启。
     # 注意：level 取 critical 需在 Bark App 内授予「重要警告」权限，否则会自动降级。
     "bark": {"enable": False, "server": "https://api.day.app", "keys": [],
@@ -889,14 +888,14 @@ def build_message(kind, sev, best, lag_min, frame_ms, last_sev, clear_pts=None):
     if kind == "解除":
         pts = [(p, s) for p, s in sorted((clear_pts or {}).items(), key=lambda kv: -kv[1])]
         if pts:
-            lst = "、".join("「%s」（原 %s）" % (p, SEV_NAMES[s]) for p, s in pts)
+            lst = "、".join("「%s」" % p for p, s in pts)
             tail = "已回到正常" if len(pts) == 1 else "已全部回到正常"
             body = "%s%s。\n\n帧时间（北京）：%s（约 %.0f 分钟前）" % (lst, tail, bj(frame_ms), lag_min)
             title = "✅ 厦门短临 · 预警解除" + ((" · " + pts[0][0]) if len(pts) == 1 else "")
         else:
             title = "✅ 厦门短临 · 预警解除"
-            body = ("所有监测对象已回到正常（原 %s）。\n\n帧时间（北京）：%s（约 %.0f 分钟前）"
-                    % (SEV_NAMES[last_sev], bj(frame_ms), lag_min))
+            body = ("所有监测对象已回到正常。\n\n帧时间（北京）：%s（约 %.0f 分钟前）"
+                    % (bj(frame_ms), lag_min))
         return title, body
     p = best
     dist = p.get("d_now") if p.get("arrived") else p.get("dist")
