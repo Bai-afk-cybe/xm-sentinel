@@ -1,0 +1,4 @@
+# 这些文件每轮从 ntfy 信箱现拉 / 每轮重建，不进仓库
+subscribers.json
+.run.lock
+__pycache__/
