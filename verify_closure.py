@@ -68,7 +68,7 @@ def load_rows(days=None, quiet=False):
             except Exception:
                 continue
     if days:
-        cut = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cut = (datetime.now(timezone(timedelta(hours=8))) - timedelta(days=days)).strftime("%Y-%m-%d")
         rows = [r for r in rows if r.get("ts", "")[:10] >= cut]
     return rows
 
