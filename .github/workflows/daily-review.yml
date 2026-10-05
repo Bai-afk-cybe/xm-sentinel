@@ -1,0 +1,60 @@
+name: xm-daily-review
+
+# 每日复盘校验：把「前一天报了什么」和「后来实际发生了什么」对账，
+# 生成 markdown 报告入库，并把摘要推到方糖手机。
+#
+# cron 用 UTC：0 1 * * * = 北京 09:00。
+# ⚠️ GitHub 的 schedule 在整点高峰期常延迟 5~30 分钟，实际到达约 09:05~09:35。
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# ★ 与 sentinel.yml 共用同一个 group：复盘与巡检串行，避免两者同时 push 造成冲突。
+#   代价是复盘可能排队等一轮巡检（最多 9 分钟），换来的是绝不会互相覆盖。
+concurrency:
+  group: xm-sentinel
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # Node.js 20 已于 2026-09 从 runner 移除——升到声明 node24 的版本消除弃用警告（同 sentinel.yml）。
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: 安装 Pillow（装不上也不拦，脚本有纯 Python 解码兜底）
+        run: pip install Pillow || true
+
+      - name: 每日复盘（回验打分 + 生成报告 + 推送摘要）
+        env:
+          XM_FTQQ_KEY: ${{ secrets.XM_FTQQ_KEY }}
+          # 地面降水实况：用于判分，以及「缺地面证据时自动回溯补采」。
+          # 未配置 → 自动回落 Open-Meteo（仍可回溯补采，无需 key）。
+          XM_CAIYUN_TOKEN: ${{ secrets.XM_CAIYUN_TOKEN }}
+          XM_QWEATHER_KEY: ${{ secrets.XM_QWEATHER_KEY }}
+          XM_QWEATHER_HOST: ${{ secrets.XM_QWEATHER_HOST }}
+        run: python daily_review.py
+
+      - name: 提交报告与检验流水
+        run: |
+          git config user.name  "xm-sentinel-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add -A
+          if git diff --cached --quiet; then
+            echo "无变化，跳过提交"
+          else
+            git commit -m "review: daily $(date -u '+%F')"
+            git push
+          fi
