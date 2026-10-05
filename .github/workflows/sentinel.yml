@@ -17,14 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 9
     steps:
-      - uses: actions/checkout@v4
+      # Node.js 20 已于 2026-09 从 runner 移除；checkout@v4 / setup-python@v5 是 node20 版，
+      # 现被强制跑在 Node 24 上并弹 deprecation 警告。升到声明 node24 的版本即可消除：
+      #   actions/checkout  v5+ = node24（v4 = node20）
+      #   actions/setup-python  v6+ = node24（v5 = node20）
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: 安装 Pillow（装不上也不拦，脚本有纯 Python 解码兜底）
-        run: pip install Pillow || true
+      - name: 安装依赖（Pillow 装不上也不拦，脚本有纯 Python 解码兜底；cryptography 用于 Web Push）
+        run: pip install Pillow cryptography || true
 
       - name: 解码订阅镜像（如有上一轮的）
         env:
@@ -37,6 +41,15 @@ jobs:
       - name: 哨兵巡检一轮
         env:
           XM_FTQQ_KEY: ${{ secrets.XM_FTQQ_KEY }}
+          # 地面降水实况（回验判分/准确率统计的 ground truth）。
+          # 未配置 → 自动回落 Open-Meteo（无需 key，但是模式值、分辨率粗）。
+          # 配置了 → 切到彩云 1km 实测级真值（推荐）。值填在仓库 Secrets 里。
+          XM_CAIYUN_TOKEN: ${{ secrets.XM_CAIYUN_TOKEN }}
+          # 备用实测源：和风（1km）。彩云未配而配了它时自动启用；都不配则回落 Open-Meteo。
+          XM_QWEATHER_KEY: ${{ secrets.XM_QWEATHER_KEY }}
+          XM_QWEATHER_HOST: ${{ secrets.XM_QWEATHER_HOST }}
+          # Web Push 息屏提醒：VAPID 私钥（对应页面前端写死的公钥）。不配则跳过息屏提醒，不影响其他通道。
+          XM_VAPID_PRIVATE_KEY: ${{ secrets.XM_VAPID_PRIVATE_KEY }}
         run: python xm_sentinel.py
 
       - name: 加密并回写状态
